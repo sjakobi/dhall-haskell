@@ -19,7 +19,7 @@ module Dhall.Main
     , main
     ) where
 
-import Control.Applicative (optional, (<|>))
+import Control.Applicative (optional, (<|>), some)
 import Control.Exception (SomeException)
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -63,6 +63,7 @@ import qualified Dhall.Lint
 import qualified Dhall.Parser
 import qualified Dhall.Pretty
 import qualified Dhall.Repl
+import qualified Dhall.Tags
 import qualified Dhall.TypeCheck
 import qualified GHC.IO.Encoding
 import qualified Options.Applicative
@@ -94,6 +95,7 @@ data Mode
     | Hash
     | Diff { expr1 :: Text, expr2 :: Text }
     | Lint { inplace :: Maybe FilePath }
+    | Tags { files :: [FilePath] }
     | Encode { json :: Bool }
     | Decode { json :: Bool }
 
@@ -174,6 +176,10 @@ parseMode =
             "freeze"
             "Add integrity checks to remote import statements of an expression"
             (Freeze <$> optional parseInplace <*> parseAllFlag)
+    <|> subcommand
+            "tags"
+            "Produce Ctags file"
+            (Tags <$> some (Options.Applicative.strArgument (Options.Applicative.metavar "FILES")))
     <|> subcommand
             "encode"
             "Encode a Dhall expression to binary"
@@ -471,6 +477,16 @@ command (Options {..}) = do
                             <>  Dhall.Pretty.prettyCharacterSet characterSet lintedExpression
 
                     renderDoc System.IO.stdout doc
+
+        Tags files -> do
+            let tagsFromFile file = do
+                    text <- Data.Text.IO.readFile file
+                    expression <- Dhall.Core.throws (Dhall.Parser.exprFromText file text)
+                    pure (Dhall.Tags.tags expression)
+
+            tags <- foldMap tagsFromFile files
+
+            renderDoc System.IO.stdout (Dhall.Tags.ctags tags)
 
         Encode {..} -> do
             expression <- getExpression

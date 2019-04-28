@@ -442,6 +442,7 @@ Library
         Dhall.Parser,
         Dhall.Pretty,
         Dhall.Repl,
+        Dhall.Tags,
         Dhall.TH,
         Dhall.Tutorial,
         Dhall.TypeCheck
