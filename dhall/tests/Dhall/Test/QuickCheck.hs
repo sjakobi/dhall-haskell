@@ -27,6 +27,7 @@ import Dhall.Core
     , Var(..)
     )
 
+import Control.DeepSeq (NFData)
 import Dhall.Set (Set)
 import Dhall.Src (Src(..))
 import Numeric.Natural (Natural)
@@ -36,6 +37,7 @@ import Test.QuickCheck.Instances ()
 import Test.Tasty (TestTree)
 import Text.Megaparsec (SourcePos(..), Pos)
 
+import qualified Control.DeepSeq
 import qualified Control.Exception
 import qualified Codec.Serialise
 import qualified Data.Coerce
@@ -354,14 +356,15 @@ binaryRoundtrip expression =
 
 isNormalizedIsConsistentWithNormalize :: Expr () Import -> Property
 isNormalizedIsConsistentWithNormalize expression =
-        Dhall.Core.isNormalized expression
-    === (errorToMaybe (Dhall.Core.normalize expression) == Just expression)
+    case errorToMaybe (Dhall.Core.normalize expression) of
+        Just nf -> Dhall.Core.isNormalized expression === (nf == expression)
+        Nothing -> Test.QuickCheck.discard
   where
     {-# NOINLINE errorToMaybe #-}
-    errorToMaybe :: a -> Maybe a
+    errorToMaybe :: NFData a => a -> Maybe a
     errorToMaybe x = System.IO.Unsafe.unsafePerformIO $
         Control.Exception.catch
-            (Just <$> Control.Exception.evaluate x)
+            (x `Control.DeepSeq.deepseq` pure (Just x))
             (\(Control.Exception.ErrorCall _) -> pure Nothing)
 
 isSameAsSelf :: Expr () Import -> Property
@@ -381,7 +384,7 @@ tests =
           )
         , ( "isNormalized should be consistent with normalize"
           , Test.QuickCheck.property
-              (Test.QuickCheck.withMaxSuccess 10000 isNormalizedIsConsistentWithNormalize)
+              (Test.QuickCheck.withMaxSuccess 500000 isNormalizedIsConsistentWithNormalize)
           )
         , ( "An expression should have no difference with itself"
           , Test.QuickCheck.property
