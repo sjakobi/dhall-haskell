@@ -374,7 +374,7 @@ tests =
           )
         , ( "isNormalized should be consistent with normalize"
           , Test.QuickCheck.property
-              (Test.QuickCheck.withMaxSuccess 500000 isNormalizedIsConsistentWithNormalize)
+              (Test.QuickCheck.withMaxSuccess 10000 isNormalizedIsConsistentWithNormalize)
           )
         , ( "An expression should have no difference with itself"
           , Test.QuickCheck.property
