@@ -1932,7 +1932,10 @@ isNormalized e0 = loop (denote e0)
                               Nothing -> True
                       _ -> True
               _ -> True
-      ToMap x t -> loop x && all loop t
+      ToMap x t -> loop x && all loop t &&
+          case x of
+              RecordLit _ -> False
+              _ -> True
       Field r _ -> loop r &&
           case r of
               RecordLit _ -> False
