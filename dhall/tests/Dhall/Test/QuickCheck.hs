@@ -27,7 +27,6 @@ import Dhall.Core
     , Var(..)
     )
 
-import Control.DeepSeq (NFData)
 import Dhall.Set (Set)
 import Dhall.Src (Src(..))
 import Numeric.Natural (Natural)
@@ -37,8 +36,7 @@ import Test.QuickCheck.Instances ()
 import Test.Tasty (TestTree)
 import Text.Megaparsec (SourcePos(..), Pos)
 
-import qualified Control.DeepSeq
-import qualified Control.Exception
+import qualified Control.Spoon
 import qualified Codec.Serialise
 import qualified Data.Coerce
 import qualified Data.List
@@ -49,7 +47,6 @@ import qualified Dhall.Core
 import qualified Dhall.Diff
 import qualified Dhall.Set
 import qualified Dhall.TypeCheck
-import qualified System.IO.Unsafe
 import qualified Test.QuickCheck
 import qualified Test.Tasty.QuickCheck
 import qualified Text.Megaparsec       as Megaparsec
@@ -356,16 +353,9 @@ binaryRoundtrip expression =
 
 isNormalizedIsConsistentWithNormalize :: Expr () Import -> Property
 isNormalizedIsConsistentWithNormalize expression =
-    case errorToMaybe (Dhall.Core.normalize expression) of
+    case Control.Spoon.spoon (Dhall.Core.normalize expression) of
         Just nf -> Dhall.Core.isNormalized expression === (nf == expression)
         Nothing -> Test.QuickCheck.discard
-  where
-    {-# NOINLINE errorToMaybe #-}
-    errorToMaybe :: NFData a => a -> Maybe a
-    errorToMaybe x = System.IO.Unsafe.unsafePerformIO $
-        Control.Exception.catch
-            (x `Control.DeepSeq.deepseq` pure (Just x))
-            (\(Control.Exception.ErrorCall _) -> pure Nothing)
 
 isSameAsSelf :: Expr () Import -> Property
 isSameAsSelf expression =
