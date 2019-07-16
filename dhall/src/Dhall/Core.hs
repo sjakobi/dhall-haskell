@@ -1759,6 +1759,11 @@ isNormalizedWith :: (Eq s, Eq a) => Normalizer a -> Expr s a -> Bool
 isNormalizedWith ctx e = e == normalizeWith (Just (ReifiedNormalizer ctx)) e
 
 -- | Quickly check if an expression is in normal form
+--
+-- Given a well-typed expression @e@, @'isNormalized' e@ is equivalent to
+-- @e == 'normalize' e@.
+--
+-- Given an ill-typed expression, 'isNormalized' may return 'True' or 'False'.
 isNormalized :: Eq a => Expr s a -> Bool
 isNormalized e0 = loop (denote e0)
   where
