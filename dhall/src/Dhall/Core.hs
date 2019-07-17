@@ -1764,193 +1764,199 @@ isNormalizedWith ctx e = e == normalizeWith (Just (ReifiedNormalizer ctx)) e
 -- @e == 'normalize' e@.
 --
 -- Given an ill-typed expression, 'isNormalized' may return 'True' or 'False'.
-isNormalized :: Eq a => Expr s a -> Bool
+isNormalized :: Eq a => Expr s a -> Maybe Bool
 isNormalized e0 = loop (denote e0)
   where
     loop e = case e of
-      Const _ -> True
-      Var _ -> True
-      Lam _ a b -> loop a && loop b
-      Pi _ a b -> loop a && loop b
-      App f a -> loop f && loop a && case App f a of
-          App (Lam _ _ _) _ -> False
+      Const _ -> Just True
+      Var _ -> Just True
+      Lam _ a b -> loop a `and'` loop b
+      Pi _ a b -> loop a `and'` loop b
+      App f a -> loop f `and'` loop a `and'` case App f a of
+          App (Lam _ _ _) _ -> Just False
 
           -- build/fold fusion for `List`
-          App (App ListBuild _) (App (App ListFold _) _) -> False
+          App (App ListBuild _) (App (App ListFold _) _) -> Just False
 
           -- build/fold fusion for `Natural`
-          App NaturalBuild (App NaturalFold _) -> False
+          App NaturalBuild (App NaturalFold _) -> Just False
 
           -- build/fold fusion for `Optional`
-          App (App OptionalBuild _) (App (App OptionalFold _) _) -> False
+          App (App OptionalBuild _) (App (App OptionalFold _) _) -> Just False
 
-          App (App (App (App NaturalFold (NaturalLit _)) _) _) _ -> False
-          App NaturalFold (NaturalLit _) -> False
-          App NaturalBuild _ -> False
-          App NaturalIsZero (NaturalLit _) -> False
-          App NaturalEven (NaturalLit _) -> False
-          App NaturalOdd (NaturalLit _) -> False
-          App NaturalShow (NaturalLit _) -> False
-          App NaturalToInteger (NaturalLit _) -> False
-          App IntegerShow (IntegerLit _) -> False
-          App IntegerToDouble (IntegerLit _) -> False
-          App DoubleShow (DoubleLit _) -> False
-          App (App OptionalBuild _) _ -> False
-          App (App ListBuild _) _ -> False
+          App (App (App (App NaturalFold (NaturalLit _)) _) _) _ -> Just False
+          App NaturalFold (NaturalLit _) -> Just False
+          App NaturalBuild _ -> Just False
+          App NaturalIsZero (NaturalLit _) -> Just False
+          App NaturalEven (NaturalLit _) -> Just False
+          App NaturalOdd (NaturalLit _) -> Just False
+          App NaturalShow (NaturalLit _) -> Just False
+          App NaturalToInteger (NaturalLit _) -> Just False
+          App IntegerShow (IntegerLit _) -> Just False
+          App IntegerToDouble (IntegerLit _) -> Just False
+          App DoubleShow (DoubleLit _) -> Just False
+          App (App OptionalBuild _) _ -> Just False
+          App (App ListBuild _) _ -> Just False
           App (App (App (App (App ListFold _) (ListLit _ _)) _) _) _ ->
-              False
-          App (App ListLength _) (ListLit _ _) -> False
-          App (App ListHead _) (ListLit _ _) -> False
-          App (App ListLast _) (ListLit _ _) -> False
-          App (App ListIndexed _) (ListLit _ _) -> False
-          App (App ListReverse _) (ListLit _ _) -> False
+              Just False
+          App (App ListLength _) (ListLit _ _) -> Just False
+          App (App ListHead _) (ListLit _ _) -> Just False
+          App (App ListLast _) (ListLit _ _) -> Just False
+          App (App ListIndexed _) (ListLit _ _) -> Just False
+          App (App ListReverse _) (ListLit _ _) -> Just False
           App (App (App (App (App OptionalFold _) (Some _)) _) _) _ ->
-              False
+              Just False
           App (App (App (App (App OptionalFold _) (App None _)) _) _) _ ->
-              False
+              Just False
           App TextShow (TextLit (Chunks [] _)) ->
-              False
-          _ -> True
-      Let _ _ -> False
-      Annot _ _ -> False
-      Bool -> True
-      BoolLit _ -> True
-      BoolAnd x y -> loop x && loop y && decide x y
+              Just False
+          _ -> Just True
+      Let _ _ -> Just False
+      Annot _ _ -> Just False
+      Bool -> Just True
+      BoolLit _ -> Just True
+      BoolAnd x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (BoolLit _)  _          = False
-          decide  _          (BoolLit _) = False
-          decide  l           r          = not (judgmentallyEqual l r)
-      BoolOr x y -> loop x && loop y && decide x y
+          decide (BoolLit _)  _          = Just False
+          decide  _          (BoolLit _) = Just False
+          decide  l           r          = Just (not (judgmentallyEqual l r))
+      BoolOr x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (BoolLit _)  _          = False
-          decide  _          (BoolLit _) = False
-          decide  l           r          = not (judgmentallyEqual l r)
-      BoolEQ x y -> loop x && loop y && decide x y
+          decide (BoolLit _)  _          = Just False
+          decide  _          (BoolLit _) = Just False
+          decide  l           r          = Just (not (judgmentallyEqual l r))
+      BoolEQ x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (BoolLit True)  _             = False
-          decide  _             (BoolLit True) = False
-          decide  l              r             = not (judgmentallyEqual l r)
-      BoolNE x y -> loop x && loop y && decide x y
+          decide (BoolLit True)  _             = Just False
+          decide  _             (BoolLit True) = Just False
+          decide  l              r             = Just (not (judgmentallyEqual l r))
+      BoolNE x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (BoolLit False)  _               = False
-          decide  _              (BoolLit False ) = False
-          decide  l               r               = not (judgmentallyEqual l r)
+          decide (BoolLit False)  _               = Just False
+          decide  _              (BoolLit False ) = Just False
+          decide  l               r               = Just (not (judgmentallyEqual l r))
       BoolIf x y z ->
-          loop x && loop y && loop z && decide x y z
+          loop x `and'` loop y `and'` loop z `and'` decide x y z
         where
-          decide (BoolLit _)  _              _              = False
-          decide  _          (BoolLit True) (BoolLit False) = False
-          decide  _           l              r              = not (judgmentallyEqual l r)
-      Natural -> True
-      NaturalLit _ -> True
-      NaturalFold -> True
-      NaturalBuild -> True
-      NaturalIsZero -> True
-      NaturalEven -> True
-      NaturalOdd -> True
-      NaturalShow -> True
-      NaturalToInteger -> True
-      NaturalPlus x y -> loop x && loop y && decide x y
+          decide (BoolLit _)  _              _              = Just False
+          decide  _          (BoolLit True) (BoolLit False) = Just False
+          decide  _           l              r              = Just (not (judgmentallyEqual l r))
+      Natural -> Just True
+      NaturalLit _ -> Just True
+      NaturalFold -> Just True
+      NaturalBuild -> Just True
+      NaturalIsZero -> Just True
+      NaturalEven -> Just True
+      NaturalOdd -> Just True
+      NaturalShow -> Just True
+      NaturalToInteger -> Just True
+      NaturalPlus x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (NaturalLit 0)  _             = False
-          decide  _             (NaturalLit 0) = False
-          decide (NaturalLit _) (NaturalLit _) = False
-          decide  _              _             = True
-      NaturalTimes x y -> loop x && loop y && decide x y
+          decide (NaturalLit 0)  _             = Just False
+          decide  _             (NaturalLit 0) = Just False
+          decide (NaturalLit _) (NaturalLit _) = Just False
+          decide  _              _             = Just True
+      NaturalTimes x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (NaturalLit 0)  _             = False
-          decide  _             (NaturalLit 0) = False
-          decide (NaturalLit 1)  _             = False
-          decide  _             (NaturalLit 1) = False
-          decide (NaturalLit _) (NaturalLit _) = False
-          decide  _              _             = True
-      Integer -> True
-      IntegerLit _ -> True
-      IntegerShow -> True
-      IntegerToDouble -> True
-      Double -> True
-      DoubleLit _ -> True
-      DoubleShow -> True
-      Text -> True
-      TextLit (Chunks [("", _)] "") -> False
-      TextLit (Chunks xys _) -> all (all check) xys
+          decide (NaturalLit 0)  _             = Just False
+          decide  _             (NaturalLit 0) = Just False
+          decide (NaturalLit 1)  _             = Just False
+          decide  _             (NaturalLit 1) = Just False
+          decide (NaturalLit _) (NaturalLit _) = Just False
+          decide  _              _             = Just True
+      Integer -> Just True
+      IntegerLit _ -> Just True
+      IntegerShow -> Just True
+      IntegerToDouble -> Just True
+      Double -> Just True
+      DoubleLit _ -> Just True
+      DoubleShow -> Just True
+      Text -> Just True
+      TextLit (Chunks [("", _)] "") -> Just False
+      TextLit (Chunks xys _) -> all' (check . snd) xys
         where
-          check y = loop y && case y of
-              TextLit _ -> False
-              _         -> True
-      TextAppend _ _ -> False
-      TextShow -> True
-      List -> True
-      ListLit t es -> all loop t && all loop es
-      ListAppend x y -> loop x && loop y && decide x y
+          check y = loop y `and'` case y of
+              TextLit _ -> Just False
+              _         -> Just True
+      TextAppend _ _ -> Just False
+      TextShow -> Just True
+      List -> Just True
+      ListLit t es -> all' loop t `and'` all' loop es
+      ListAppend x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (ListLit _ m)  _            | Data.Sequence.null m = False
-          decide  _            (ListLit _ n) | Data.Sequence.null n = False
-          decide (ListLit _ _) (ListLit _ _)                        = False
-          decide  _             _                                   = True
-      ListBuild -> True
-      ListFold -> True
-      ListLength -> True
-      ListHead -> True
-      ListLast -> True
-      ListIndexed -> True
-      ListReverse -> True
-      Optional -> True
+          decide (ListLit _ m)  _            | Data.Sequence.null m = Just False
+          decide  _            (ListLit _ n) | Data.Sequence.null n = Just False
+          decide (ListLit _ _) (ListLit _ _)                        = Just False
+          decide  _             _                                   = Just True
+      ListBuild -> Just True
+      ListFold -> Just True
+      ListLength -> Just True
+      ListHead -> Just True
+      ListLast -> Just True
+      ListIndexed -> Just True
+      ListReverse -> Just True
+      Optional -> Just True
       Some a -> loop a
-      None -> True
-      OptionalFold -> True
-      OptionalBuild -> True
-      Record kts -> Dhall.Map.isSorted kts && all loop kts
-      RecordLit kvs -> Dhall.Map.isSorted kvs && all loop kvs
-      Union kts -> Dhall.Map.isSorted kts && all (all loop) kts
-      UnionLit _ v kvs -> loop v && Dhall.Map.isSorted kvs && all (all loop) kvs
-      Combine x y -> loop x && loop y && decide x y
+      None -> Just True
+      OptionalFold -> Just True
+      OptionalBuild -> Just True
+      Record kts -> Just (Dhall.Map.isSorted kts) `and'` all' loop kts
+      RecordLit kvs -> Just (Dhall.Map.isSorted kvs) `and'` all' loop kvs
+      Union kts -> Just (Dhall.Map.isSorted kts) `and'` all' (all' loop) kts
+      UnionLit _ v kvs -> loop v `and'` Just (Dhall.Map.isSorted kvs) `and'` all' (all' loop) kvs
+      Combine x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (RecordLit m) _ | Data.Foldable.null m = False
-          decide _ (RecordLit n) | Data.Foldable.null n = False
-          decide (RecordLit _) (RecordLit _) = False
-          decide  _ _ = True
-      CombineTypes x y -> loop x && loop y && decide x y
+          decide (RecordLit m) _ | Data.Foldable.null m = Just False
+          decide _ (RecordLit n) | Data.Foldable.null n = Just False
+          decide (RecordLit _) (RecordLit _) = Just False
+          decide  _ _ = Just True
+      CombineTypes x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (Record m) _ | Data.Foldable.null m = False
-          decide _ (Record n) | Data.Foldable.null n = False
-          decide (Record _) (Record _) = False
-          decide  _ _ = True
-      Prefer x y -> loop x && loop y && decide x y
+          decide (Record m) _ | Data.Foldable.null m = Just False
+          decide _ (Record n) | Data.Foldable.null n = Just False
+          decide (Record _) (Record _) = Just False
+          decide  _ _ = Just True
+      Prefer x y -> loop x `and'` loop y `and'` decide x y
         where
-          decide (RecordLit m) _ | Data.Foldable.null m = False
-          decide _ (RecordLit n) | Data.Foldable.null n = False
-          decide (RecordLit _) (RecordLit _) = False
-          decide  _ _ = True
-      Merge x y t -> loop x && loop y && all loop t &&
+          decide (RecordLit m) _ | Data.Foldable.null m = Just False
+          decide _ (RecordLit n) | Data.Foldable.null n = Just False
+          decide (RecordLit _) (RecordLit _) = Just False
+          decide  _ _ = Just True
+      Merge x y t -> loop x `and'` loop y `and'` all' loop t `and'`
           case x of
               RecordLit kvsX ->
                   case y of
                       UnionLit kY _  _ ->
                           case Dhall.Map.lookup kY kvsX of
-                              Just _  -> False
-                              Nothing -> True
-                      _ -> True
-              _ -> True
-      ToMap x t -> loop x && all loop t &&
+                              Just _  -> Just False
+                              Nothing -> Just True
+                      _ -> Just True
+              _ -> Just True
+      ToMap x t -> loop x `and'` all' loop t `and'`
           case x of
-              RecordLit _ -> False
-              _ -> True
-      Field r _ -> loop r &&
+              RecordLit _ -> Just False
+              _ -> Just True
+      Field r _ -> loop r `and'`
           case r of
-              RecordLit _ -> False
-              _ -> True
-      Project r p -> loop r &&
+              RecordLit _ -> Just False
+              _ -> Just True
+      Project r p -> loop r `and'`
           case p of
               Left s -> case r of
-                  RecordLit _ -> False
-                  _ -> not (Dhall.Set.null s) && Dhall.Set.isSorted s
+                  RecordLit _ -> Just False
+                  _ -> Just (not (Dhall.Set.null s) && Dhall.Set.isSorted s)
               Right e' -> case e' of
-                  Record _ -> False
+                  Record _ -> Just False
                   _ -> loop e'
       Note _ e' -> loop e'
       ImportAlt l _r -> loop l
-      Embed _ -> True
+      Embed _ -> Just True
+
+    and' (Just True) (Just True) = Just True
+    and' (Just _) (Just _) = Just False
+    and' _ _ = Nothing
+
+    all' p xs = foldr (\x acc -> p x `and'` acc) (Just True) xs
 
 {-| Detect if the given variable is free within the given expression
 
