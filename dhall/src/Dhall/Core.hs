@@ -1936,15 +1936,20 @@ isNormalized e0 = loop (denote e0)
           case x of
               RecordLit _ -> Just False
               _ -> Just True
-      Field r _ -> loop r `and'`
+      Field r x -> loop r `and'`
           case r of
-              RecordLit _ -> Just False
+              RecordLit kvs -> case Dhall.Map.member x kvs of
+                  True -> Just False
+                  False -> Nothing
+              Union kvs -> case Dhall.Map.member x kvs of
+                  True -> Just True
+                  False -> Nothing
               _ -> Just True
       Project r p -> loop r `and'`
           case p of
-              Left s -> case r of
+              Left s -> Just (not (Dhall.Set.null s)) `and'` case r of
                   RecordLit _ -> Just False
-                  _ -> Just (not (Dhall.Set.null s) && Dhall.Set.isSorted s)
+                  _ -> Just (Dhall.Set.isSorted s)
               Right e' -> case e' of
                   Record _ -> Just False
                   _ -> loop e'

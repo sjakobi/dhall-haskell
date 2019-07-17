@@ -67,7 +67,7 @@ equivalent text0 text1 = do
 
 assertNormalizesTo :: Expr Src X -> Text -> IO ()
 assertNormalizesTo e expected = do
-  assertBool msg (not $ Dhall.Core.isNormalized e)
+  assertBool msg (Dhall.Core.isNormalized e /= Just True)
   normalize' e @?= expected
   where msg = "Given expression is already in normal form"
 
@@ -79,7 +79,7 @@ assertNormalizesToWith ctx e expected = do
 
 assertNormalized :: Expr Src X -> IO ()
 assertNormalized e = do
-  assertBool msg1 (Dhall.Core.isNormalized e)
+  assertBool msg1 (Dhall.Core.isNormalized e == Just True)
   assertEqual msg2 (normalize' e) (Dhall.Core.pretty e)
   where msg1 = "Expression was not in normal form"
         msg2 = "Normalization is not supposed to change the expression"
